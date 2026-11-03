@@ -1,35 +1,44 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
 const mongoose = require('mongoose');
-const cors = require('cors');
+const Ad = require('./models/Ad');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+app.use(express.json()); // السماح بقراءة بيانات JSON المرسلة
 
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*" }
-});
-
-// الاتصال بقاعدة البيانات
+const PORT = process.env.PORT || 10000;
 const MONGO_URI = process.env.MONGO_URI;
-if (MONGO_URI) {
-  mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Connected to MongoDB Atlas'))
-    .catch(err => console.error('❌ MongoDB Connection Error:', err));
-}
 
+// الاتصال بقاعدة بيانات MongoDB Atlas
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('Connected to MongoDB Atlas successfully!'))
+  .catch((err) => console.error('MongoDB Connection Error:', err));
+
+// الصفحة الرئيسية للتأكد من عمل السيرفر
 app.get('/', (req, res) => {
-  res.send('Mazaad Syria Backend is running!');
+  res.send('Mazaad Syria Backend is running and connected to DB!');
 });
 
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+// 1. مسار جلب جميع الإعلانات
+app.get('/api/ads', async (req, res) => {
+  try {
+    const ads = await Ad.find().sort({ createdAt: -1 });
+    res.json(ads);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch ads' });
+  }
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+// 2. مسار إضافة إعلان جديد
+app.post('/api/ads', async (req, res) => {
+  try {
+    const newAd = new Ad(req.body);
+    const savedAd = await newAd.save();
+    res.status(201).json(savedAd);
+  } catch (err) {
+    res.status(400).json({ error: 'Failed to create ad', details: err.message });
+  }
+});
+
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
